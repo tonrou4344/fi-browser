@@ -1,72 +1,144 @@
 import json
+import re
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
-BASE = "https://www.j-platpat.inpit.go.jp/cache/classify/patent/PMGS_HTML/jpp/FI/ja/"
+BASE = (
+    "https://www.j-platpat.inpit.go.jp/"
+    "cache/classify/patent/PMGS_HTML/jpp/FI/ja/"
+)
+
 YEAR = "202604"
 
 visited = set()
-
 records = []
+
+session = requests.Session()
+
+session.headers.update({
+    "User-Agent":
+    "Mozilla/5.0"
+})
+
 
 def get(url):
 
-    print(url)
-
-    r = requests.get(url, timeout=120)
+    r = session.get(
+        url,
+        timeout=120
+    )
 
     r.raise_for_status()
 
     return r.text
 
+
+def extract_level(title):
+
+    m = re.match(
+        r"^(・+)",
+        title
+    )
+
+    if not m:
+        return 0
+
+    return len(m.group(1))
+
+
+def add_record(
+    code,
+    title,
+    fterm="",
+    hb=False,
+    cc=False
+):
+
+    records.append({
+
+        "code": code,
+
+        "title": title.lstrip("・"),
+
+        "level": extract_level(title),
+
+        "fterm": fterm,
+
+        "hb": hb,
+
+        "cc": cc
+
+    })
+
+
 def crawl_filist(url):
+
+    print("FILIST", url)
 
     html = get(url)
 
-    soup = BeautifulSoup(html, "lxml")
+    soup = BeautifulSoup(
+        html,
+        "lxml"
+    )
 
     rows = soup.find_all("tr")
 
-    for r in rows:
+    for row in rows:
 
-        a = r.find("a")
+        a = row.find("a")
 
-        e = r.find(class_="explanationArea")
+        explain = row.find(
+            class_="explanationArea"
+        )
 
-        if e is None:
+        if not a:
             continue
 
-        if a and a.get("name"):
+        if not explain:
+            continue
 
-            code = a["name"]
+        fi_code = a.get("name")
 
-            title = e.get_text(" ", strip=True)
+        if not fi_code:
+            continue
 
-            hb = False
-            cc = False
-            fterm = ""
+        title = explain.get_text(
+            " ",
+            strip=True
+        )
 
-            for x in r.find_all("a"):
+        hb = False
+        cc = False
+        fterm = ""
 
-                txt = x.get_text(strip=True)
+        for link in row.find_all("a"):
 
-                if txt == "HB":
-                    hb = True
+            txt = link.get_text(
+                strip=True
+            )
 
-                elif txt == "CC":
-                    cc = True
+            if txt == "HB":
+                hb = True
 
-                elif txt.startswith("4"):
-                    fterm = txt
+            elif txt == "CC":
+                cc = True
 
-            records.append({
-                "code": code,
-                "title": title,
-                "hb": hb,
-                "cc": cc,
-                "fterm": fterm
-            })
+            elif re.match(
+                r"^\d[A-Z]\d+",
+                txt
+            ):
+                fterm = txt
+
+        add_record(
+            fi_code,
+            title,
+            fterm,
+            hb,
+            cc
+        )
+
 
 def crawl(url):
 
@@ -75,48 +147,93 @@ def crawl(url):
 
     visited.add(url)
 
-    html = get(url)
+    print("CRAWL", url)
 
-    soup = BeautifulSoup(html, "lxml")
+    try:
+
+        html = get(url)
+
+    except Exception as e:
+
+        print(e)
+
+        return
+
+    soup = BeautifulSoup(
+        html,
+        "lxml"
+    )
 
     for a in soup.find_all("a"):
 
-        href = a.get("href", "")
+        href = a.get(
+            "href",
+            ""
+        )
+
+        if not href:
+            continue
+
+        if "javascript:" in href:
+            continue
+
+        full = urljoin(
+            url,
+            href
+        )
 
         if "fiClass" in href:
-            crawl(urljoin(url, href))
+
+            crawl(full)
 
         elif "fiSubClass" in href:
-            crawl(urljoin(url, href))
+
+            crawl(full)
 
         elif "fiMainGroup" in href:
-            crawl(urljoin(url, href))
+
+            crawl(full)
 
         elif "fiList" in href:
 
-            full = urljoin(url, href)
-
             crawl_filist(full)
 
-root = (
- BASE
- +
- "fiSection/fiSection.html?select="
- +
- YEAR
+
+SECTIONS = list(
+    "ABCDEFGH"
 )
 
-crawl(root)
+for s in SECTIONS:
+
+    start = (
+        BASE
+        + "fiClass/"
+        + f"fiClass{s}.html"
+        + "?select="
+        + YEAR
+    )
+
+    crawl(start)
+
+
+records.sort(
+    key=lambda x: x["code"]
+)
 
 with open(
- "data/fi_latest.json",
- "w",
- encoding="utf-8"
+    "data/fi_latest.json",
+    "w",
+    encoding="utf-8"
 ) as f:
 
     json.dump(
-      records,
-      f,
-      ensure_ascii=False,
-      indent=2
+        records,
+        f,
+        ensure_ascii=False,
+        indent=2
     )
+
+print(
+    "Records:",
+    len(records)
+)
