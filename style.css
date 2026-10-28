@@ -1,0 +1,48 @@
+body{
+ margin:0;
+ font-family:
+ "Yu Gothic",
+ sans-serif;
+}
+
+header{
+ background:#16355c;
+ color:white;
+ padding:10px;
+ display:flex;
+ gap:10px;
+}
+
+#search{
+ flex:1;
+}
+
+#layout{
+ display:flex;
+ height:calc(100vh - 55px);
+}
+
+#tree{
+ width:40%;
+ overflow:auto;
+ border-right:1px solid #ccc;
+ padding:10px;
+}
+
+#detail{
+ flex:1;
+ padding:20px;
+}
+
+.item{
+ cursor:pointer;
+ padding:4px;
+}
+
+.item:hover{
+ background:#eef;
+}
+
+.hit{
+ background:yellow;
+}
