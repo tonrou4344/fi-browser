@@ -1,6 +1,6 @@
 let data = [];
 
-fetch("../data/tree.json")
+fetch("data/tree.json")
 .then(r=>r.json())
 .then(x=>{
 
