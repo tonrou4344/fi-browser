@@ -1,39 +1,50 @@
 import json
-import re
 
 with open(
- "data/fi_latest.json",
- encoding="utf-8"
+    "data/fi_latest.json",
+    encoding="utf-8"
 ) as f:
 
     rows = json.load(f)
 
-tree = []
+root = []
+
+stack = []
 
 for row in rows:
 
-    title = row["title"]
+    node = {
+        **row,
+        "children": []
+    }
 
-    level = len(
-      re.match(
-        r"^・*",
-        title
-      ).group(0)
-    )
+    level = row["level"]
 
-    row["title"] = title.lstrip("・")
+    while (
+        len(stack) > level
+    ):
+        stack.pop()
 
-    row["level"] = level
+    if level == 0:
+
+        root.append(node)
+
+    else:
+
+        stack[-1]["children"]\
+            .append(node)
+
+    stack.append(node)
 
 with open(
- "data/tree.json",
- "w",
- encoding="utf-8"
+    "data/tree.json",
+    "w",
+    encoding="utf-8"
 ) as f:
 
     json.dump(
-      rows,
-      f,
-      ensure_ascii=False,
-      indent=2
+        root,
+        f,
+        ensure_ascii=False,
+        indent=2
     )
